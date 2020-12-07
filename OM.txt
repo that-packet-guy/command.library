@@ -1,0 +1,103 @@
+------------------------------------------------L-CHTR-------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------
+
+*******************************************************************************************************
+*************************************************IOS-XR************************************************
+*******************************************************************************************************
+
+>> OM Policy Maps <<
+## policy-map QOS-MARK-ALL-VID-NOPRI ##
+#--------------------------------------
+policy-map QOS-MARK-ALL-VID-NOPRI
+description MARKING ALL TRAFFIC TO PREVENT VIDEO TILING ON VID-5.3.3 patch no Priority
+class class-default
+  set dscp 32
+! 
+ end-policy-map
+#--------------------------------------
+## policy-map QSP-STRIP-DSCP-OUT ##
+#--------------------------------------
+policy-map QSP-STRIP-DSCP-OUT
+description STRIP DSCP SETTING TO ZERO
+class class-default
+  set dscp default
+! 
+ end-policy-map
+#--------------------------------------
+>> CONNECTED-NETWORK-MGMT prefix-list <<
+#--------------------------------------
+edit prefix-set CONNECTED-NETWORK-MGMT inline add {CBO_SUBNET}{CBO_SUBNET_SLASH_NOTATION}
+# remove below placeholder if needed, if not skip this line
+edit prefix-set CONNECTED-NETWORK-MGMT inline remove 255.255.255.255/32
+#--------------------------------------
+
+>> Port Configuation <<
+#--------------------------------------
+interface BVI{BVI_Number} description "[TYPE=VIDEO][BW=1G][GRNT=CHNXXXXXXXX][ZLOC=OM{OM_NUM}][IP={OM_IP}][DNP]"
+interface BVI{BVI_Number} mtu 9216
+interface BVI{BVI_Number} service-policy input QOS-MARK-ALL-VID-NOPRI
+interface BVI{BVI_Number} service-policy output QSP-STRIP-DSCP-OUT
+interface BVI{BVI_Number} ipv4 helper-address vrf default 172.28.29.105
+interface BVI{BVI_Number} ipv4 address {CBO_IP} 255.255.255.224
+interface BVI{BVI_Number} load-interval 30
+no interface BVI{BVI_Number} shutdown
+!
+multicast-routing address-family ipv4 interface BVI{BVI_Number} 
+multicast-routing address-family ipv4 interface BVI{BVI_Number} enable
+
+router igmp interface BVI{BVI_Number} 
+router igmp interface BVI{BVI_Number} explicit-tracking
+router igmp interface BVI{BVI_Number} version 3
+router igmp interface BVI{BVI_Number} router enable
+!
+interface {CBO_PORT} description "[TYPE=VIDEO][BW=1G][BVI={BVI_Number}][ZLOC=OM{OM_NUM}][DNP]"
+interface {CBO_PORT} 
+interface {CBO_PORT} mtu 9216
+interface {CBO_PORT} speed 100
+interface {CBO_PORT} load-interval 30
+interface {CBO_PORT} transceiver permit pid all
+interface {CBO_PORT} l2transport
+no interface {CBO_PORT} shutdown
+!
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt 
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt mac limit maximum 500
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt mac limit action no-flood
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt mac limit notification both
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt mtu 9216
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt interface {CBO_PORT}
+l2vpn bridge group DSGSVOMmgmt bridge-domain DSGSVOMmgmt routed interface BVI{BVI_Number}
+!
+dhcp ipv4 profile DNCS_bootp relay 
+dhcp ipv4 profile DNCS_bootp relay helper-address vrf default 10.253.0.1
+dhcp ipv4 profile DNCS_bootp relay helper-address vrf default 172.28.29.101
+dhcp ipv4 profile DNCS_bootp relay helper-address vrf default 172.28.29.105
+dhcp ipv4 profile DNCS_bootp relay relay information option allow-untrusted
+dhcp ipv4 interface BVI{BVI_Number} relay profile DNCS_bootp
+#--------------------------------------
+
+*******************************************************************************************************
+***************************************************IOS*************************************************
+*******************************************************************************************************
+
+>> CONNECTED-NETWORK-MGMT prefix-list <<
+#--------------------------------------
+edit prefix-set CONNECTED-NETWORK-MGMT inline add {CBO_SUBNET}{CBO_SUBNET_SLASH_NOTATION}
+# remove below placeholder if needed, if not skip this line
+edit prefix-set CONNECTED-NETWORK-MGMT inline remove 255.255.255.255/32
+#--------------------------------------
+>> Port Configuation <<
+#--------------------------------------
+interface {CBO_PORT}
+ description [TYPE=VIDEO][BW=1G][GRNT=chn00000000][ZLOC={CBO_DEVICE}-OM-{OM_NUM}][IP={OM_IP}]
+ ip address {CBO_IP} {CBO_SUBNET_255_MASK}
+ ip access-group PROTECT_VIDEO out
+ ip helper-address {HELPER_IP}
+ no ip redirects
+ ip pim sparse-mode
+ ip igmp version 3
+ load-interval 30
+ exit
+#--------------------------------------
