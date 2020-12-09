@@ -101,3 +101,17 @@ interface {CBO_PORT}
  load-interval 30
  exit
 #--------------------------------------
+
+*******************************************************************************************************
+*************************************************junos*************************************************
+*******************************************************************************************************
+
+set interfaces {CBO_PORT} description "[TYPE=VIDEO][BW=1G][GRNT=chn00000000][ZLOC={CBO_DEVICE}-OM-{OM_NUM}][IP={OM_IP}]"
+set interfaces {CBO_PORT} mtu 1514
+set interfaces {CBO_PORT} unit 0 family inet filter output PROTECT_VIDEO
+set interfaces {CBO_PORT} unit 0 family inet address {CBO_IP}{CBO_SUBNET_SLASH_NOTATION}
+delete interfaces {CBO_PORT} disable
+set forwarding-options dhcp-relay group DHCP_INTERFACE_GROUP_1 interface {CBO_PORT}.0
+#
+set protocols igmp interface {CBO_PORT}.0 version 3
+set protocols pim interface {CBO_PORT}.0 mode sparse
